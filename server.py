@@ -23,12 +23,15 @@ REPORT_URL = f"{BASE_CORE_URL}/reports"
 cache = Cache.from_url("memory://")
 cache.serializer = JsonSerializer()
 
+
 async def get_current_period() -> List[Message]:
 
     async with httpx.AsyncClient() as client:
         response = await client.get(CURRENT_PERIOD_URL)
-        data = response.json()  
-        messages: List[Message] = TypeAdapter(List[Message]).validate_python(data["messages"])
+        data = response.json()
+        messages: List[Message] = TypeAdapter(List[Message]).validate_python(
+            data["messages"]
+        )
 
     return messages
 
@@ -43,20 +46,28 @@ async def get_message_usage(message: Message) -> Usage:
         async with httpx.AsyncClient() as client:
             response = await client.get(f"{REPORT_URL}/{message.report_id}")
 
-            if response.status_code != HTTPStatus.OK:  
-                print(f"Error getting response for report id: {message.report_id}\n{response}")
-                cost = calculate_message_cost(message) 
+            if response.status_code != HTTPStatus.OK:
+                print(
+                    f"Error getting response for report id: {message.report_id}\n{response}"
+                )
+                cost = calculate_message_cost(message)
             else:
-                data = response.json()  
+                data = response.json()
                 report = Report.parse_obj(data)
                 cost = Report.parse_obj(data).credit_cost
 
-    return Usage(message_id=message.id, timestamp = message.timestamp, credits_used = cost, report_name = report.name if report else None) 
+    return Usage(
+        message_id=message.id,
+        timestamp=message.timestamp,
+        credits_used=cost,
+        report_name=report.name if report else None,
+    )
 
 
 async def get_current_period_usages() -> List[Usage]:
     messages = await get_current_period()
     return await asyncio.gather(*(get_message_usage(message) for message in messages))
+
 
 @app.get("/usage")
 async def get_usage(request: Request):
@@ -66,11 +77,12 @@ async def get_usage(request: Request):
     if not data:
         data = await get_current_period_usages()
         cache.set(request.url.path, data, ttl=60)
-    
+
     return JSONResponse(
-        content={"usage" : [usage.dict() for usage in data ]},
-        headers={"Cache-Control": "public, max-age=60"}
+        content={"usage": [usage.dict() for usage in data]},
+        headers={"Cache-Control": "public, max-age=60"},
     )
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

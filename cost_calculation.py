@@ -5,6 +5,7 @@ BASE_MESSAGE_COST = 1
 MESSAGE_LENGTH_PENALTY_COST = 5
 WORD_UNIQUINESS_DISCOUNT = 2
 
+
 def calculate_word_cost(word: str) -> int:
     if not word:
         return 0
@@ -13,22 +14,23 @@ def calculate_word_cost(word: str) -> int:
 
     if 1 <= word_length <= 3:
         word_cost = 0.1
-        
+
     if 4 <= word_length <= 7:
         word_cost = 0.2
 
     if 8 <= word_length:
-        word_cost = 0.3      
+        word_cost = 0.3
 
     if word_length >= 3:
         for every_third_char in word[2::3]:
-            if every_third_char in {'a', 'e', 'i', 'o', 'u'}:
+            if every_third_char in {"a", "e", "i", "o", "u"}:
                 word_cost += 0.3
 
     return word_cost
 
+
 def is_palindrome(text: str) -> bool:
-    alphanumeric_text = ''.join(char.lower() for char in text if char.isalnum())
+    alphanumeric_text = "".join(char.lower() for char in text if char.isalnum())
     left_index = 0
     right_index = len(alphanumeric_text) - 1
 
@@ -36,11 +38,12 @@ def is_palindrome(text: str) -> bool:
     while left_index <= right_index:
         if not alphanumeric_text[left_index] == alphanumeric_text[right_index]:
             return False
-        
+
         left_index += 1
         right_index -= 1
 
     return True
+
 
 def calculate_message_cost(message: Message):
     # whitespaces are also represented by characters
@@ -59,7 +62,7 @@ def calculate_message_cost(message: Message):
             continue
 
         cost += calculate_word_cost(word)
-        
+
         if word in word_counts:
             word_counts[word] += 1
         else:

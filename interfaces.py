@@ -1,6 +1,7 @@
 from typing import Optional
 from pydantic import BaseModel
 
+
 class Message(BaseModel):
     id: int
     text: str
@@ -8,10 +9,12 @@ class Message(BaseModel):
     timestamp: str
     report_id: Optional[int] = None
 
+
 class Report(BaseModel):
     id: int
     name: str
     credit_cost: float
+
 
 class Usage(BaseModel):
     message_id: int
