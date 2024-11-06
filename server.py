@@ -13,6 +13,7 @@ import asyncio
 
 from cost_calculation import calculate_text_cost
 from interfaces import Message, Usage, Report
+import json
 
 app = FastAPI()
 
@@ -41,7 +42,7 @@ async def get_message_usage(message: Message) -> Usage:
 
     # save an I/O call
     if not message.report_id:
-        cost = calculate_text_cost(message)
+        cost = calculate_text_cost(message.text)
     else:
         async with httpx.AsyncClient() as client:
             response = await client.get(f"{REPORT_URL}/{message.report_id}")
@@ -50,11 +51,11 @@ async def get_message_usage(message: Message) -> Usage:
                 print(
                     f"Error getting response for report id: {message.report_id}\n{response}"
                 )
-                cost = calculate_text_cost(message)
+                cost = calculate_text_cost(message.text)
             else:
                 data = response.json()
                 report = Report.parse_obj(data)
-                cost = Report.parse_obj(data).credit_cost
+                cost = report.credit_cost
 
     return Usage(
         message_id=message.id,
@@ -64,22 +65,21 @@ async def get_message_usage(message: Message) -> Usage:
     )
 
 
-async def get_current_period_usages() -> List[Usage]:
-    messages = await get_current_period()
-    return await asyncio.gather(*(get_message_usage(message) for message in messages))
-
-
 @app.get("/usage")
 async def get_usage(request: Request):
 
-    data = await cache.get(request.url.path)
+    usage_serialised = await cache.get(request.url.path)
 
-    if not data:
-        data = await get_current_period_usages()
-        cache.set(request.url.path, data, ttl=60)
+    if not usage_serialised:
+        messages = await get_current_period()
+        data = await asyncio.gather(
+            *[get_message_usage(message) for message in messages]
+        )
+        usages_serialised = [usage.model_dump() for usage in data]
+        await cache.set(request.url.path, usages_serialised, ttl=60)
 
     return JSONResponse(
-        content={"usage": [usage.dict() for usage in data]},
+        content={"usage": usages_serialised},
         headers={"Cache-Control": "public, max-age=60"},
     )
 

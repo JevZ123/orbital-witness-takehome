@@ -60,6 +60,7 @@ def is_palindrome(text: str) -> bool:
 
 
 def calculate_text_cost(text: str):
+
     # whitespaces are also represented by characters
     cost = len(text) * BASE_CHARACTER_COST + BASE_MESSAGE_COST
 
