@@ -11,7 +11,7 @@ import httpx
 import uvicorn
 import asyncio
 
-from cost_calculation import calculate_message_cost
+from cost_calculation import calculate_text_cost
 from interfaces import Message, Usage, Report
 
 app = FastAPI()
@@ -41,7 +41,7 @@ async def get_message_usage(message: Message) -> Usage:
 
     # save an I/O call
     if not message.report_id:
-        cost = calculate_message_cost(message)
+        cost = calculate_text_cost(message)
     else:
         async with httpx.AsyncClient() as client:
             response = await client.get(f"{REPORT_URL}/{message.report_id}")
@@ -50,7 +50,7 @@ async def get_message_usage(message: Message) -> Usage:
                 print(
                     f"Error getting response for report id: {message.report_id}\n{response}"
                 )
-                cost = calculate_message_cost(message)
+                cost = calculate_text_cost(message)
             else:
                 data = response.json()
                 report = Report.parse_obj(data)
