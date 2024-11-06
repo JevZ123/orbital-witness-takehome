@@ -1,7 +1,12 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from pydantic import TypeAdapter
 from typing import List
 from http import HTTPStatus
+
+from aiocache import Cache
+from aiocache.serializers import JsonSerializer
+
 import httpx
 import uvicorn
 import asyncio
@@ -14,6 +19,9 @@ app = FastAPI()
 BASE_CORE_URL = "https://owpublic.blob.core.windows.net/tech-task"
 CURRENT_PERIOD_URL = f"{BASE_CORE_URL}/messages/current-period"
 REPORT_URL = f"{BASE_CORE_URL}/reports"
+
+cache = Cache.from_url("memory://")
+cache.serializer = JsonSerializer()
 
 async def get_current_period() -> List[Message]:
 
@@ -37,7 +45,7 @@ async def get_message_usage(message: Message) -> Usage:
 
             if response.status_code != HTTPStatus.OK:  
                 print(f"Error getting response for report id: {message.report_id}\n{response}")
-                return calculate_message_cost(message) 
+                cost = calculate_message_cost(message) 
             else:
                 data = response.json()  
                 report = Report.parse_obj(data)
@@ -51,9 +59,18 @@ async def get_current_period_usages() -> List[Usage]:
     return await asyncio.gather(*(get_message_usage(message) for message in messages))
 
 @app.get("/usage")
-async def get_usage():
-    return {"usage" : await get_current_period_usages()}
+async def get_usage(request: Request):
 
+    data = await cache.get(request.url.path)
+
+    if not data:
+        data = await get_current_period_usages()
+        cache.set(request.url.path, data, ttl=60)
+    
+    return JSONResponse(
+        content={"usage" : [usage.dict() for usage in data ]},
+        headers={"Cache-Control": "public, max-age=60"}
+    )
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
