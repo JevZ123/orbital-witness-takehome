@@ -10,6 +10,8 @@ The server should be running on port 8000 and the `/usage` endpoint service the 
 
 ## Test it
 
+`python -m pytest`
+
 ## Lint it
 
 `python3 -m black .`

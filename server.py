@@ -54,7 +54,7 @@ async def get_message_usage(message: Message) -> Usage:
                 cost = calculate_text_cost(message.text)
             else:
                 data = response.json()
-                report = Report.parse_obj(data)
+                report = Report.model_validate(data)
                 cost = report.credit_cost
 
     return Usage(
