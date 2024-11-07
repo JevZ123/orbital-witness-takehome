@@ -39,4 +39,5 @@ The server should be running on port 8000 and the `/usage` endpoint service the 
 * I did not set up more robust formatting rules and linting due to time constraints
 * I did add any error propagation to the client
 * I did not prepare the project structure for a seamless expansion of tests and capabilities due to time constraints
+* I did not create a more complex CI workflow due to time constraints
 
