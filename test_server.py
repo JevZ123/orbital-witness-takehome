@@ -17,6 +17,32 @@ client = TestClient(app)
 
 class TestCostCalculations(unittest.IsolatedAsyncioTestCase):
 
+    async def test_calls_api_if_report_id(self):
+        TEXT_COST = 123
+        message = Message(id=1, text="text", timestamp="timestamp", report_id=123)
+        report = Report(id=123, name="name", credit_cost=TEXT_COST)
+
+        with patch(
+            "server.httpx.AsyncClient.get", new_callable=AsyncMock
+        ) as mock_get, patch(
+            "server.calculate_text_cost", return_value=TEXT_COST
+        ) as mock_calculate:
+
+            expected_usage = Usage(
+                message_id=message.id,
+                timestamp=message.timestamp,
+                credits_used=report.credit_cost,
+                report_name=report.name,
+            )
+
+            mock_get.return_value = httpx.Response(
+                status_code=200, json=report.model_dump()
+            )
+
+            self.assertEqual(await get_message_usage(message), expected_usage)
+            mock_get.assert_called_once_with(f"{REPORT_URL}/{message.report_id}")
+            mock_calculate.assert_not_called()
+
     async def test_falls_back_on_calculations(self):
         TEXT_COST = 123
         message = Message(id=1, text="text", timestamp="timestamp", report_id=123)
@@ -37,32 +63,6 @@ class TestCostCalculations(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await get_message_usage(message), expected_usage)
             mock_get.assert_called_once_with(f"{REPORT_URL}/{message.report_id}")
             mock_calculate.assert_called_once_with(message.text)
-
-    async def test_calls_api_if_report_id(self):
-        TEXT_COST = 123
-        message = Message(id=1, text="text", timestamp="timestamp", report_id=123)
-        report = Report(id=123, name="name", credit_cost=TEXT_COST)
-
-        with patch(
-            "server.httpx.AsyncClient.get", new_callable=AsyncMock
-        ) as mock_get, patch(
-            "server.calculate_text_cost", return_value=TEXT_COST
-        ) as mock_calculate:
-
-            expected_usage = Usage(
-                message_id=message.id,
-                timestamp=message.timestamp,
-                credits_used=TEXT_COST,
-                report_name=report.name,
-            )
-
-            mock_get.return_value = httpx.Response(
-                status_code=200, json=report.model_dump()
-            )
-
-            self.assertEqual(await get_message_usage(message), expected_usage)
-            mock_get.assert_called_once_with(f"{REPORT_URL}/{message.report_id}")
-            mock_calculate.assert_not_called()
 
     async def test_calculates_if_no_report_id(self):
         TEXT_COST = 123
@@ -113,8 +113,6 @@ class TestCostCalculations(unittest.IsolatedAsyncioTestCase):
         ), patch("server.get_message_usage") as mock_get_usage:
 
             async def get_message_usage_side_effect(message: Message) -> Usage:
-                print(message)
-                print("+")
                 if message == message_one:
                     return usage_one
                 else:
@@ -123,4 +121,7 @@ class TestCostCalculations(unittest.IsolatedAsyncioTestCase):
             mock_get_usage.side_effect = get_message_usage_side_effect
 
             response = client.get("/usage")
-            # self.assertEqual(response.json(), {"usage" : [usage_one.model_dump(), usage_two.model_dump()]})
+            self.assertEqual(
+                response.json(),
+                {"usage": [usage_one.model_dump(), usage_two.model_dump()]},
+            )

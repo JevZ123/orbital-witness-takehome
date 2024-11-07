@@ -13,13 +13,14 @@ import asyncio
 
 from cost_calculation import calculate_text_cost
 from interfaces import Message, Usage, Report
-import json
 
 app = FastAPI()
 
 BASE_CORE_URL = "https://owpublic.blob.core.windows.net/tech-task"
 CURRENT_PERIOD_URL = f"{BASE_CORE_URL}/messages/current-period"
 REPORT_URL = f"{BASE_CORE_URL}/reports"
+CLIENT_SIDE_CACHE_EXPIRY_TIME = 60
+SERVER_SIDE_CACHE_EXPIRY_TIME = 60
 
 cache = Cache.from_url("memory://")
 cache.serializer = JsonSerializer()
@@ -40,7 +41,6 @@ async def get_current_period() -> List[Message]:
 async def get_message_usage(message: Message) -> Usage:
     report = None
 
-    # save an I/O call
     if not message.report_id:
         cost = calculate_text_cost(message.text)
     else:
@@ -68,19 +68,22 @@ async def get_message_usage(message: Message) -> Usage:
 @app.get("/usage")
 async def get_usage(request: Request):
 
-    usage_serialised = await cache.get(request.url.path)
+    # try returning from the cache as much as possible
+    usages_serialised = await cache.get(request.url.path)
 
-    if not usage_serialised:
+    if not usages_serialised:
         messages = await get_current_period()
         data = await asyncio.gather(
             *[get_message_usage(message) for message in messages]
         )
         usages_serialised = [usage.model_dump() for usage in data]
-        await cache.set(request.url.path, usages_serialised, ttl=60)
+        await cache.set(
+            request.url.path, usages_serialised, ttl=SERVER_SIDE_CACHE_EXPIRY_TIME
+        )
 
     return JSONResponse(
         content={"usage": usages_serialised},
-        headers={"Cache-Control": "public, max-age=60"},
+        headers={"Cache-Control": f"public, max-age={CLIENT_SIDE_CACHE_EXPIRY_TIME}"},
     )
 
 
